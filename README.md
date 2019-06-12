@@ -14,4 +14,4 @@ Click the "Run App" button to get started.
 
 This App is intended to assist in the automatic subsetting of data.  Input data will be tested for a user specified average type (mean or median) and for standard deviation.  Random subsetting will be performed on the data and the subset which best matches the original data with a smaller sample size will be output as the "Fair Subset".
 
-For users who which to use the fairsubset function, the package "fairsubset" may be downloaded from CRAN, or the tar.gz file from https://github.com/jrdelaney/FairSubset/
+For users who which to use the fairsubset function within R, the package "fairsubset" may be downloaded from CRAN, or the tar.gz file from https://github.com/jrdelaney/FairSubset/
