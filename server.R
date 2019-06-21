@@ -3,7 +3,12 @@ library(data.table)
 library(ggplot2)
 library(matrixStats)
 
-function(input, output) {
+function(input, output, session) {
+  
+  observeEvent(input$refresh, {
+    shinyjs::reset("all_inputs")
+    session$reload()
+  })
   
   example_data_download <- as.data.frame(fread(paste0("Example_Data.csv"), header= TRUE, stringsAsFactors = FALSE))
   output$example_data_download <- downloadHandler(
@@ -19,14 +24,17 @@ function(input, output) {
   
   statistical_shiny <- eventReactive(input$run_simulations,{
     
+    warning <- ""
+    average_setting <- input$average_setting
+    
+    pasted_data_1 <- NULL
     if(!is.null(input$uploaded_data_1)){
       pasted_data_1 <- as.data.frame(fread(input$uploaded_data_1$datapath, stringsAsFactors = FALSE))
     } else {
     pasted_data_1 <- as.data.frame(fread(input$pasted_data_1, stringsAsFactors = FALSE))
     }
-    #testing: pasted_data_1 <- as.data.frame(fread("Example_Data_char.csv", header = TRUE, stringsAsFactors = FALSE))
-    warning <- ""
-    average_setting <- input$average_setting
+    
+    
     
     pasted_data_header <- colnames(pasted_data_1)
     pasted_data_1 <- lapply(1:ncol(pasted_data_1), function(column){unlist(pasted_data_1[,column])[!is.na(unlist(pasted_data_1[,column]))]})
@@ -58,7 +66,9 @@ function(input, output) {
     
     if(average_setting == "Mean"){
     average_values_all <- sapply(1:length(pasted_data_1), function(list_item){mean(pasted_data_1[[list_item]])})
-    } else { #Median
+    }
+    
+    if(average_setting %in% c("Median", "Kolmogorov-Smirnov") ){ 
     average_values_all <- sapply(1:length(pasted_data_1), function(list_item){median(pasted_data_1[[list_item]])})  
     }
     
@@ -76,7 +86,8 @@ function(input, output) {
     average_values_randomized <- lapply(1:1000, function(iteration){
       abs(colMeans(all_sampled_data[[iteration]]) - average_values_all) #subtract to get distance vector from original
     })
-    } else { #Median
+    } 
+    if(average_setting %in% c("Median", "Kolmogorov-Smirnov")){ 
     average_values_randomized <- lapply(1:1000, function(iteration){
       abs(colMedians(as.matrix(all_sampled_data[[iteration]])) - average_values_all)
     })
@@ -89,6 +100,66 @@ function(input, output) {
     average_vector <- rep(0,1000)
     standard_deviation_vector <- rep(0,1000)
     sum_vector <- rep(0,1000)
+    
+    if(average_setting == "Kolmogorov-Smirnov"){
+      KS_pvals <- lapply(1:1000, function(iteration){
+        sapply(1:ncol(sampled_data), function(column){
+          suppressWarnings({ #otherwise, R fills with tie warnings
+            ks.test(pasted_data_1[[column]],all_sampled_data[[iteration]][,column], alternative = "two.sided", exact = NULL)$p.value
+          })
+        })
+      })
+
+      best_and_worst_simulations <- lapply(1:length(pasted_data_1), function(list_item){
+
+      p_val_vector <- sapply(1:1000, function(iteration){return(KS_pvals[[iteration]][list_item])})
+      max_pval <- max(p_val_vector)
+      min_pval <- min(p_val_vector)
+      
+      best_simulations_for_further_testing  <- as.integer(which(p_val_vector == max(p_val_vector)))
+      worst_simulations_for_further_testing <- as.integer(which(p_val_vector == min(p_val_vector)))
+      
+      if(length(best_simulations_for_further_testing) > 1 | length(worst_simulations_for_further_testing) > 1){
+        
+        average_vector <-
+          sapply(1:1000, function(iteration){
+            average_values_randomized[[iteration]][list_item]
+          }) /
+          sum(sapply(1:1000, function(iteration){ #dividing by sum results in equal weight of average and standard deviation
+            average_values_randomized[[iteration]][list_item]
+          })) * 1000
+        
+        standard_deviation_vector <- 
+          sapply(1:1000, function(iteration){
+            standard_deviation_values_randomized[[iteration]][list_item]
+          }) / 
+          sum(sapply(1:1000, function(iteration){ #dividing by sum results in equal weight of average and standard deviation
+            standard_deviation_values_randomized[[iteration]][list_item]
+          })) *1000
+        
+        sum_vector <- sapply(1:1000, function(iteration){sum( c(average_vector[iteration],standard_deviation_vector[iteration]), na.rm=TRUE)}) #determine best simulation for given column
+        
+        sum_vector_best  <- sum_vector[best_simulations_for_further_testing]
+        sum_vector_worst <- sum_vector[worst_simulations_for_further_testing]
+        
+        return(list(
+           best  = min(as.integer(which(sum_vector  == min(sum_vector_best))),na.rm=TRUE )
+          ,worst = min(as.integer(which(sum_vector == min(sum_vector_worst))),na.rm=TRUE )
+        ))
+        
+      } else {
+        return(list(
+           best  = as.integer(which(p_val_vector == max(p_val_vector)))
+          ,worst = as.integer(which(p_val_vector == min(p_val_vector)))
+          ))
+      }
+      
+      })
+      best_simulations <- as.numeric(unlist(sapply(1:length(pasted_data_1), function(list_item){best_and_worst_simulations[[list_item]]$best})))
+      worst_simulations <-   as.numeric(unlist(sapply(1:length(pasted_data_1), function(list_item){best_and_worst_simulations[[list_item]]$worst})))
+    }
+    
+    
     
     best_simulations <- unlist(sapply(1:length(pasted_data_1), function(list_item){
       
@@ -103,7 +174,7 @@ function(input, output) {
       }) /
         sum(sapply(1:1000, function(iteration){ #dividing by sum results in equal weight of average and standard deviation
           average_values_randomized[[iteration]][list_item]
-        })) *1000
+        })) * 1000
       
       standard_deviation_vector <- 
       sapply(1:1000, function(iteration){
@@ -274,6 +345,7 @@ function(input, output) {
       ,worst_subset = worst_sampled_data
       ,done = 'done'
       ))
+    
       
   })
  
@@ -296,6 +368,7 @@ function(input, output) {
     },
     contentType = "text/csv"
   )
+  
   output$executed = renderText({statistical_shiny()$done})
   outputOptions(output, "executed", suspendWhenHidden=FALSE)
   
