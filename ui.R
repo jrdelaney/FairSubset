@@ -45,6 +45,7 @@ fluidPage(
       conditionalPanel(
         condition = "output.executed != 'done' ",
         helpText('Please input your data.  For an example of how the data should be formatted, please click "Download example input data"'),
+        uiOutput("tab"),
         br(),
         img(src='FairSubset_Landing.PNG', align = "left", width = 637, height = 302)
       ),
