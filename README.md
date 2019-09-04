@@ -1,6 +1,9 @@
 # FairSubset
 R Shiny App for fair subsetting of data
 
+Detailed description of the App and the underlying calculations can be found in the publication at:
+http://www.jbmethods.org/jbm/article/view/299/265
+
 To run FairSubset as a Shiny App, R and RStudio must be installed.  
 https://www.r-project.org/
 https://www.rstudio.com/
