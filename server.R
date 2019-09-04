@@ -5,6 +5,12 @@ library(matrixStats)
 
 function(input, output, session) {
   
+  url <- a("published here.", href="http://www.jbmethods.org/jbm/article/view/299/265")
+  output$tab <- renderUI({
+    tagList("FairSubset documentation is ", url)
+  })
+  
+  
   observeEvent(input$refresh, {
     shinyjs::reset("all_inputs")
     session$reload()
